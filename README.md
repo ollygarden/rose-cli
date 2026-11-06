@@ -8,7 +8,8 @@ Rose CLI binaries and templates for self-hosting Rose in your environment.
 ## GitHub Actions
 
 Copy [templates/github/rose-review.yml](templates/github/rose-review.yml) to
-`.github/workflows/` and add these secrets:
+`.github/workflows/`, add these secrets, and run it from the Actions tab
+(Run workflow) on the branch to review:
 
 | Secret | Description |
 | --- | --- |
