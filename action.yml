@@ -1,0 +1,66 @@
+name: Rose
+description: Run the Rose CLI in your CI and report the run to OllyGarden.
+inputs:
+  command:
+    description: "Rose command to run: review, fix or instrumentation."
+    required: true
+  github-token:
+    description: Token that can read ollygarden/rose releases.
+    required: true
+  ollygarden-api-key:
+    description: OllyGarden organization API key.
+    required: true
+  openrouter-api-key:
+    description: OpenRouter key for the default models.
+    required: true
+  model:
+    description: "Overrides all default models: <provider>/<model-id>[:<thinking>]."
+    required: false
+  version:
+    description: Rose release tag, e.g. v0.6.62, or latest.
+    default: latest
+  api-url:
+    description: OllyGarden API base URL.
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Install Rose
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64) platform=linux-x64 ;;
+          macOS-ARM64) platform=darwin-arm64 ;;
+          *) echo "::error::Rose has no build for $RUNNER_OS $RUNNER_ARCH"; exit 1 ;;
+        esac
+        dir="$RUNNER_TEMP/rose"
+        mkdir -p "$dir"
+        tag=()
+        if [ "$VERSION" != latest ]; then tag=("$VERSION"); fi
+        gh release download ${tag[@]+"${tag[@]}"} -R ollygarden/rose -D "$dir" --clobber \
+          -p "rose_*_${platform}.tar.gz" -p SHA256SUMS
+        archive="$(cd "$dir" && ls rose_*_"${platform}".tar.gz)"
+        (cd "$dir" && grep "  ${archive}\$" SHA256SUMS | shasum -a 256 -c -)
+        tar -xzf "$dir/$archive" -C "$dir"
+        echo "$dir" >> "$GITHUB_PATH"
+    - name: Run Rose
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        MODEL: ${{ inputs.model }}
+        OLLYGARDEN_API_KEY: ${{ inputs.ollygarden-api-key }}
+        OLLYGARDEN_API_URL: ${{ inputs.api-url }}
+        OPENROUTER_API_KEY: ${{ inputs.openrouter-api-key }}
+      run: |
+        set -euo pipefail
+        args=("$COMMAND")
+        if [ -n "$MODEL" ]; then args+=(-m "$MODEL"); fi
+        output="$RUNNER_TEMP/rose-output.txt"
+        status=0
+        rose "${args[@]}" | tee "$output" || status=$?
+        { echo "## Rose $COMMAND"; echo '```text'; cat "$output"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        exit "$status"
