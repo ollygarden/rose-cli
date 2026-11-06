@@ -1,13 +1,11 @@
 # Copy to .github/workflows/rose-review.yml.
 name: Rose review
 on:
-  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
   review:
-    # Secrets are unavailable to fork pull requests.
-    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
